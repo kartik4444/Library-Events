@@ -1,7 +1,12 @@
 package com.Library.Events.LibraryEventsProducer.producer;
 
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ExecutionException;
-
+import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.header.Header;
+import org.apache.kafka.common.header.internals.RecordHeader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,6 +28,8 @@ public class LibraryEventProducer {
 	private KafkaTemplate<Integer, String> kafkaTemplate;
 	@Autowired
 	private ObjectMapper objectMapper;
+	private String topic = "Library-Events";
+	private SendResult<Integer, String> sendResult = null;
 
 	/*
 	 * To Send Library Events ASynchronously to Kafka topic. User will get created
@@ -61,13 +68,12 @@ public class LibraryEventProducer {
 
 	/*
 	 * To Send Library Events Synchronously to Kafka topic User will get created
-	 * response only when it is successfully send to kafka topic
+	 * response only when it is successfully send to kafka topic.
 	 */
 
 	public SendResult<Integer, String> postLibraryEventSynchronous(LibraryEvent libraryEvent) throws Exception {
 		Integer key = libraryEvent.getLibraryEventId();
 		String value = objectMapper.writeValueAsString(libraryEvent);
-		SendResult<Integer, String> sendResult = null;
 		try {
 			sendResult = kafkaTemplate.sendDefault(key, value).get();
 		} catch (ExecutionException | InterruptedException e) {
@@ -80,6 +86,21 @@ public class LibraryEventProducer {
 
 		}
 		return sendResult;
+
+	}
+
+	public void postLibraryEventAsyncProdRecord(LibraryEvent libraryEvent) throws Exception {
+		Integer key = libraryEvent.getLibraryEventId();
+		String value = objectMapper.writeValueAsString(libraryEvent);
+		kafkaTemplate.send(buildProducerRecord(key, value, topic));
+
+	}
+
+	private ProducerRecord<Integer, String> buildProducerRecord(Integer key, String value, String topic2) {
+		List<Header> recordHeaders = new ArrayList<>();
+		recordHeaders.add(new RecordHeader("Event-Source", "Scanner".getBytes()));
+		recordHeaders.add(new RecordHeader("Scanned-Date", LocalDate.now().toString().getBytes()));
+		return new ProducerRecord<Integer, String>(topic, null, key, value, recordHeaders);
 
 	}
 
